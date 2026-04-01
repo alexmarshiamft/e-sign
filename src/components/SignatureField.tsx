@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Move, Trash2, GripVertical } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { SignatureField as FieldType, FieldType as FT } from '../types';
 import { SavedSignature } from '../types';
 
