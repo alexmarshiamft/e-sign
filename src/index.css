@@ -38,3 +38,19 @@
 .resize-handle {
   cursor: se-resize;
 }
+
+/* Toast slide-in animation */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-slide-in {
+  animation: toastSlideIn 0.2s ease-out forwards;
+}

@@ -29,9 +29,15 @@ export function SignatureTypeInput({ onSave, onCancel }: Props) {
     const ctx = canvas.getContext('2d')!;
     ctx.scale(scale, scale);
 
-    // transparent background
+    // Wait for font to be loaded before drawing to canvas
     const fontFamily = FONTS[fontIdx].label;
     const fontSize = Math.min(height * 0.55, 54);
+    try {
+      await document.fonts.load(`${fontSize}px "${fontFamily}"`);
+    } catch {
+      // proceed even if font load check fails
+    }
+
     ctx.font = `${fontSize}px "${fontFamily}", cursive`;
     ctx.fillStyle = '#1a1a2e';
     ctx.textBaseline = 'middle';

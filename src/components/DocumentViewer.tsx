@@ -8,12 +8,17 @@ import { SignatureFieldOverlay } from './SignatureField';
 import { Toolbar } from './Toolbar';
 import { embedSignaturesIntoPdf, downloadBlob } from '../utils/pdfUtils';
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Use locally bundled worker to avoid CDN version mismatches
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString();
 
 interface Props {
   document: ESignDocument;
   signatures: SavedSignature[];
+  selectedSignatureId: string | null;
+  onSelectedSignatureChange: (id: string | null) => void;
   onUpdateFields: (id: string, fields: SignatureField[]) => void;
   onMarkSigned: (id: string, signedData: string) => void;
   onOpenSignatureCreator: () => void;
@@ -23,6 +28,8 @@ interface Props {
 export function DocumentViewer({
   document: doc,
   signatures,
+  selectedSignatureId,
+  onSelectedSignatureChange,
   onUpdateFields,
   onMarkSigned,
   onOpenSignatureCreator,
@@ -33,25 +40,58 @@ export function DocumentViewer({
   const [scale, setScale] = useState(1.0);
   const [activeTool, setActiveTool] = useState<FieldType | null>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [selectedSigId, setSelectedSigId] = useState<string | null>(null);
-  const [pageDims, setPageDims] = useState<Record<number, { width: number; height: number }>>({});
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const [signing, setSigning] = useState(false);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  // data URI for react-pdf
-  const pdfDataUri = `data:application/pdf;base64,${doc.data}`;
+  // Show signed PDF if available, otherwise original
+  const pdfBase64 = doc.status === 'signed' && doc.signedData ? doc.signedData : doc.data;
+  const pdfDataUri = `data:application/pdf;base64,${pdfBase64}`;
 
   const onDocumentLoadSuccess = useCallback(({ numPages: n }: { numPages: number }) => {
     setNumPages(n);
     setCurrentPage(1);
   }, []);
 
-  const onPageLoadSuccess = useCallback(
-    (page: { width: number; height: number }) => {
-      setPageDims((prev) => ({ ...prev, [currentPage]: { width: page.width, height: page.height } }));
-    },
-    [currentPage]
-  );
+  const onPageLoadSuccess = useCallback(() => {
+    // Measure the container after the page renders
+    const el = pageContainerRef.current;
+    if (el) {
+      setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
+    }
+  }, []);
+
+  // Keep container size in sync with scale changes and window resize
+  const updateContainerSize = useCallback(() => {
+    const el = pageContainerRef.current;
+    if (el) setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
+  }, []);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(updateContainerSize);
+    if (pageContainerRef.current) ro.observe(pageContainerRef.current);
+    return () => ro.disconnect();
+  }, [updateContainerSize]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveTool(null);
+        setSelectedFieldId(null);
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFieldId) {
+        // Don't delete when typing in a text field
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+        const updated = doc.fields.filter((f) => f.id !== selectedFieldId);
+        onUpdateFields(doc.id, updated);
+        setSelectedFieldId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedFieldId, doc.fields, doc.id, onUpdateFields]);
 
   const handlePageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -71,14 +111,15 @@ export function DocumentViewer({
         id: crypto.randomUUID(),
         type: activeTool,
         pageNumber: currentPage,
-        x: Math.min(xPct - defaultW / 2, 1 - defaultW),
-        y: Math.min(yPct - defaultH / 2, 1 - defaultH),
+        // Clamp so field never goes off-page
+        x: Math.max(0, Math.min(xPct - defaultW / 2, 1 - defaultW)),
+        y: Math.max(0, Math.min(yPct - defaultH / 2, 1 - defaultH)),
         width: defaultW,
         height: defaultH,
         value: activeTool === 'date' ? new Date().toLocaleDateString() : undefined,
         signatureDataUrl:
           activeTool === 'signature' || activeTool === 'initials'
-            ? signatures.find((s) => s.id === selectedSigId)?.dataUrl
+            ? signatures.find((s) => s.id === selectedSignatureId)?.dataUrl
             : undefined,
       };
 
@@ -86,7 +127,7 @@ export function DocumentViewer({
       onUpdateFields(doc.id, updated);
       setSelectedFieldId(newField.id);
     },
-    [activeTool, currentPage, doc.fields, doc.id, onUpdateFields, selectedSigId, signatures]
+    [activeTool, currentPage, doc.fields, doc.id, onUpdateFields, selectedSignatureId, signatures]
   );
 
   const updateField = useCallback(
@@ -106,20 +147,25 @@ export function DocumentViewer({
     [doc.fields, doc.id, onUpdateFields, selectedFieldId]
   );
 
+  const clearAllFields = useCallback(() => {
+    onUpdateFields(doc.id, []);
+    setSelectedFieldId(null);
+  }, [doc.id, onUpdateFields]);
+
   const handleSignNow = useCallback(async () => {
-    if (!selectedSigId && signatures.length === 0) {
+    if (signatures.length === 0) {
       onToast('Please create a signature first', 'info');
       onOpenSignatureCreator();
       return;
     }
-    const sigToUse = signatures.find((s) => s.id === selectedSigId) || signatures[0];
+    const sigToUse = signatures.find((s) => s.id === selectedSignatureId) || signatures[0];
     if (!sigToUse) {
       onToast('No signature available', 'error');
       return;
     }
 
     let fields = doc.fields;
-    // If no fields placed, auto-place one on page 1
+    // If no fields placed, auto-place one at bottom of page 1
     if (fields.length === 0) {
       fields = [
         {
@@ -134,7 +180,7 @@ export function DocumentViewer({
         },
       ];
     } else {
-      // attach signature to unsigned signature/initials fields
+      // Attach signature to unsigned signature/initials fields
       fields = fields.map((f) => {
         if ((f.type === 'signature' || f.type === 'initials') && !f.signatureDataUrl) {
           return { ...f, signatureDataUrl: sigToUse.dataUrl };
@@ -161,7 +207,7 @@ export function DocumentViewer({
   }, [
     doc,
     signatures,
-    selectedSigId,
+    selectedSignatureId,
     numPages,
     pdfDataUri,
     onUpdateFields,
@@ -172,48 +218,38 @@ export function DocumentViewer({
 
   const handleDownload = useCallback(() => {
     if (!doc.signedData) return;
-    downloadBlob(doc.signedData, doc.name.replace('.pdf', '') + '_signed.pdf');
+    downloadBlob(doc.signedData, doc.name.replace(/\.pdf$/i, '') + '_signed.pdf');
     onToast('Download started', 'success');
   }, [doc, onToast]);
 
   const pageFields = doc.fields.filter((f) => f.pageNumber === currentPage);
 
-  // page container size
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const updateContainerSize = useCallback(() => {
-    const el = pageContainerRef.current;
-    if (el) setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
-  }, []);
-
-  useEffect(() => {
-    updateContainerSize();
-    const ro = new ResizeObserver(updateContainerSize);
-    if (pageContainerRef.current) ro.observe(pageContainerRef.current);
-    return () => ro.disconnect();
-  }, [updateContainerSize, scale, currentPage]);
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" tabIndex={-1}>
       <Toolbar
         activeTool={activeTool}
         onToolSelect={setActiveTool}
         signatures={signatures}
-        selectedSignatureId={selectedSigId}
-        onSignatureSelect={setSelectedSigId}
+        selectedSignatureId={selectedSignatureId}
+        onSignatureSelect={onSelectedSignatureChange}
         onSignNow={handleSignNow}
         onDownload={handleDownload}
         canDownload={doc.status === 'signed'}
         onOpenSignatureCreator={onOpenSignatureCreator}
+        hasFields={doc.fields.length > 0}
+        onClearFields={clearAllFields}
+        isSigned={doc.status === 'signed'}
       />
 
       {/* Scroll area */}
       <div className="flex-1 overflow-auto bg-gray-200 p-4">
-        {/* Page nav */}
+        {/* Page nav + zoom */}
         <div className="flex items-center justify-center gap-4 mb-3">
           <button
             disabled={currentPage <= 1}
             onClick={() => setCurrentPage((p) => p - 1)}
             className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
+            title="Previous page"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -224,29 +260,39 @@ export function DocumentViewer({
             disabled={currentPage >= numPages}
             onClick={() => setCurrentPage((p) => p + 1)}
             className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
+            title="Next page"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
           <div className="h-4 w-px bg-gray-400" />
           <button
-            onClick={() => setScale((s) => Math.max(0.5, s - 0.1))}
+            onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(1)))}
             className="p-1 rounded hover:bg-gray-300"
+            title="Zoom out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
-          <span className="text-xs text-gray-600">{Math.round(scale * 100)}%</span>
+          <span className="text-xs text-gray-600 w-9 text-center">{Math.round(scale * 100)}%</span>
           <button
-            onClick={() => setScale((s) => Math.min(2.5, s + 0.1))}
+            onClick={() => setScale((s) => Math.min(2.5, +(s + 0.1).toFixed(1)))}
             className="p-1 rounded hover:bg-gray-300"
+            title="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
         </div>
 
+        {/* Hint when tool active */}
+        {activeTool && (
+          <p className="text-center text-xs text-blue-600 font-medium mb-2">
+            Click on the document to place a <strong>{activeTool}</strong> field · Press <kbd className="bg-white px-1 rounded border text-xs">Esc</kbd> to cancel
+          </p>
+        )}
+
         {/* PDF Page */}
         <div className="flex justify-center">
           <div className="relative shadow-xl" style={{ display: 'inline-block' }}>
-            {/* Click overlay for placing fields */}
+            {/* Overlay for field placement & rendering */}
             <div
               ref={pageContainerRef}
               className={`absolute inset-0 z-10 ${activeTool ? 'cursor-crosshair' : 'cursor-default'}`}
@@ -270,8 +316,16 @@ export function DocumentViewer({
             <Document
               file={pdfDataUri}
               onLoadSuccess={onDocumentLoadSuccess}
-              loading={<div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-gray-400">Loading PDF…</div>}
-              error={<div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-red-400">Failed to load PDF</div>}
+              loading={
+                <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-gray-400">
+                  Loading PDF…
+                </div>
+              }
+              error={
+                <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-red-400">
+                  Failed to load PDF
+                </div>
+              }
             >
               <Page
                 pageNumber={currentPage}
@@ -285,6 +339,7 @@ export function DocumentViewer({
         </div>
       </div>
 
+      {/* Signing overlay */}
       {signing && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center">
           <div className="bg-white rounded-xl p-6 shadow-2xl text-center">
@@ -297,15 +352,14 @@ export function DocumentViewer({
   );
 }
 
-// Build actual PDF page dimensions using pdf.js for accurate embedding
+// Build actual PDF page dimensions at scale=1 using pdf.js
 async function buildAllPageDims(
   dataUri: string,
   numPages: number
 ): Promise<Array<{ width: number; height: number }>> {
-  const dims: Array<{ width: number; height: number }> = [];
-  // Use a temporary canvas to get rendered page sizes at scale=1
   const loadingTask = pdfjs.getDocument(dataUri);
   const pdfDoc = await loadingTask.promise;
+  const dims: Array<{ width: number; height: number }> = [];
   for (let i = 1; i <= numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const viewport = page.getViewport({ scale: 1 });

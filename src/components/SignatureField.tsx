@@ -15,24 +15,23 @@ interface Props {
 }
 
 const FIELD_LABELS: Record<FT, string> = {
-  signature: 'Signature',
+  signature: 'Click to sign',
   initials: 'Initials',
-  text: 'Text',
-  date: 'Date',
+  text: 'Click to type…',
+  date: 'Click for date',
 };
 
 const FIELD_COLORS: Record<FT, string> = {
-  signature: 'border-blue-400 bg-blue-50',
-  initials: 'border-purple-400 bg-purple-50',
-  text: 'border-green-400 bg-green-50',
-  date: 'border-orange-400 bg-orange-50',
+  signature: 'border-blue-400 bg-blue-50/80',
+  initials: 'border-purple-400 bg-purple-50/80',
+  text: 'border-green-400 bg-green-50/80',
+  date: 'border-orange-400 bg-orange-50/80',
 };
 
 export function SignatureFieldOverlay({
   field,
   containerWidth,
   containerHeight,
-  signatures,
   isSelected,
   onSelect,
   onUpdate,
@@ -41,7 +40,10 @@ export function SignatureFieldOverlay({
   const fieldRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ mouseX: number; mouseY: number; fieldX: number; fieldY: number } | null>(null);
   const resizeStart = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(null);
-  const [editingText, setEditingText] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  // Guard: if container not measured yet, don't render
+  if (containerWidth === 0 || containerHeight === 0) return null;
 
   const px = field.x * containerWidth;
   const py = field.y * containerHeight;
@@ -51,13 +53,14 @@ export function SignatureFieldOverlay({
   // ── Drag ──────────────────────────────────────────────────────────────────
   const onDragPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (editing) return;
       e.stopPropagation();
       onSelect(field.id);
       dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, fieldX: px, fieldY: py };
       const el = fieldRef.current!;
       el.setPointerCapture(e.pointerId);
     },
-    [field.id, px, py, onSelect]
+    [field.id, px, py, onSelect, editing]
   );
 
   const onDragPointerMove = useCallback(
@@ -108,83 +111,83 @@ export function SignatureFieldOverlay({
     resizeStart.current = null;
   }, []);
 
-  const sig = field.signatureDataUrl ? null : signatures.find((s) => s.id === field.value);
-  const displaySig = field.signatureDataUrl || sig?.dataUrl;
+  const isTextField = field.type === 'text' || field.type === 'date';
+  const displaySig = field.signatureDataUrl;
+
+  const handleFieldClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onSelect(field.id);
+      if (isTextField) {
+        if (field.type === 'date' && !field.value) {
+          onUpdate(field.id, { value: new Date().toLocaleDateString() });
+        }
+        setEditing(true);
+      }
+    },
+    [field.id, field.type, field.value, isTextField, onSelect, onUpdate]
+  );
 
   return (
     <div
       ref={fieldRef}
-      className={`absolute border-2 rounded flex items-center justify-center select-none
+      className={`absolute border-2 rounded flex items-center justify-center select-none group/field
         ${FIELD_COLORS[field.type]}
-        ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500 shadow-lg' : ''}
+        ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500 shadow-lg' : 'hover:shadow-md'}
       `}
       style={{ left: px, top: py, width: pw, height: ph }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(field.id);
-      }}
+      onClick={handleFieldClick}
+      onPointerDown={onDragPointerDown}
+      onPointerMove={onDragPointerMove}
+      onPointerUp={onDragPointerUp}
     >
-      {/* Move handle */}
-      <div
-        className="field-handle absolute inset-0 flex items-center justify-center"
-        onPointerDown={onDragPointerDown}
-        onPointerMove={onDragPointerMove}
-        onPointerUp={onDragPointerUp}
-      >
-        {displaySig ? (
-          <img src={displaySig} alt="signature" className="max-w-full max-h-full object-contain p-1" />
-        ) : field.type === 'text' || field.type === 'date' ? (
-          editingText ? (
-            <input
-              autoFocus
-              className="w-full h-full bg-transparent text-xs px-1 focus:outline-none"
-              value={field.value || ''}
-              onChange={(e) => onUpdate(field.id, { value: e.target.value })}
-              onBlur={() => setEditingText(false)}
-              onPointerDown={(e) => e.stopPropagation()}
-              placeholder={field.type === 'date' ? new Date().toLocaleDateString() : 'Enter text...'}
-            />
-          ) : (
-            <span
-              className="text-xs text-gray-500 px-1 truncate cursor-text w-full text-center"
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                if (field.type === 'date' && !field.value) {
-                  onUpdate(field.id, { value: new Date().toLocaleDateString() });
-                }
-                setEditingText(true);
-              }}
-            >
-              {field.value || FIELD_LABELS[field.type]}
-            </span>
-          )
-        ) : (
-          <span className="text-xs text-gray-400">{FIELD_LABELS[field.type]}</span>
-        )}
-      </div>
-
-      {/* Controls when selected */}
-      {isSelected && (
-        <>
-          <button
-            className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 z-10"
+      {displaySig ? (
+        <img src={displaySig} alt="signature" className="max-w-full max-h-full object-contain p-1" />
+      ) : isTextField ? (
+        editing ? (
+          <input
+            autoFocus
+            className="w-full h-full bg-transparent text-xs px-1 focus:outline-none cursor-text"
+            value={field.value || ''}
+            onChange={(e) => onUpdate(field.id, { value: e.target.value })}
+            onBlur={() => setEditing(false)}
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(field.id);
-            }}
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-
-          {/* Resize handle */}
-          <div
-            className="resize-handle absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-tl"
-            onPointerDown={onResizePointerDown}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
+            onClick={(e) => e.stopPropagation()}
+            placeholder={field.type === 'date' ? new Date().toLocaleDateString() : 'Enter text…'}
           />
-        </>
+        ) : (
+          <span
+            className="text-xs text-gray-600 px-1 truncate cursor-text w-full text-center"
+            title="Click to edit"
+          >
+            {field.value || FIELD_LABELS[field.type]}
+          </span>
+        )
+      ) : (
+        <span className="text-xs text-gray-500 pointer-events-none">{FIELD_LABELS[field.type]}</span>
+      )}
+
+      {/* Delete button – always visible on selected, visible on hover otherwise */}
+      <button
+        className={`absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 z-20 transition-opacity
+          ${isSelected ? 'opacity-100' : 'opacity-0 group-hover/field:opacity-100'}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(field.id);
+        }}
+      >
+        <Trash2 className="w-3 h-3" />
+      </button>
+
+      {/* Resize handle */}
+      {isSelected && (
+        <div
+          className="resize-handle absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-tl z-20"
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+        />
       )}
     </div>
   );

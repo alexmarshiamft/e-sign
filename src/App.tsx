@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { PenLine, FileText, Plus } from 'lucide-react';
 import { DocumentList } from './components/DocumentList';
 import { DocumentUpload } from './components/DocumentUpload';
@@ -14,11 +14,13 @@ let toastCounter = 0;
 
 export default function App() {
   const { documents, addDocument, deleteDocument, updateFields, markSigned } = useDocuments();
-  const { signatures, addSignature } = useSignatures();
+  const { signatures, addSignature, deleteSignature } = useSignatures();
   const [selectedDoc, setSelectedDoc] = useState<ESignDocument | null>(null);
   const [showCreator, setShowCreator] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Lift selected signature ID so it persists across the document viewer and creator
+  const [selectedSigId, setSelectedSigId] = useState<string | null>(null);
 
   const addToast = useCallback((message: string, type: Toast['type'] = 'info') => {
     const id = String(++toastCounter);
@@ -51,17 +53,26 @@ export default function App() {
 
   const handleSaveSignature = useCallback(
     (name: string, dataUrl: string) => {
-      addSignature(name, dataUrl);
-      setShowCreator(false);
+      const sig = addSignature(name, dataUrl);
+      // Auto-select the newly created signature
+      setSelectedSigId(sig.id);
       addToast('Signature saved', 'success');
     },
     [addSignature, addToast]
   );
 
+  const handleDeleteSignature = useCallback(
+    (id: string) => {
+      deleteSignature(id);
+      if (selectedSigId === id) setSelectedSigId(null);
+      addToast('Signature deleted', 'info');
+    },
+    [deleteSignature, selectedSigId, addToast]
+  );
+
   const handleUpdateFields = useCallback(
     (id: string, fields: Parameters<typeof updateFields>[1]) => {
       updateFields(id, fields);
-      // Keep selectedDoc in sync
       setSelectedDoc((prev) =>
         prev?.id === id ? { ...prev, fields, status: fields.length > 0 ? 'pending' : 'unsigned' } : prev
       );
@@ -115,7 +126,7 @@ export default function App() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <PenLine className="w-4 h-4" />
-            Manage Signatures
+            My Signatures
             {signatures.length > 0 && (
               <span className="ml-auto text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">
                 {signatures.length}
@@ -139,6 +150,8 @@ export default function App() {
             key={selectedDoc.id}
             document={selectedDoc}
             signatures={signatures}
+            selectedSignatureId={selectedSigId}
+            onSelectedSignatureChange={setSelectedSigId}
             onUpdateFields={handleUpdateFields}
             onMarkSigned={handleMarkSigned}
             onOpenSignatureCreator={() => setShowCreator(true)}
@@ -161,9 +174,16 @@ export default function App() {
         )}
       </main>
 
-      {/* Modals */}
+      {/* Signature Manager Modal */}
       {showCreator && (
-        <SignatureCreator onSave={handleSaveSignature} onClose={() => setShowCreator(false)} />
+        <SignatureCreator
+          signatures={signatures}
+          onSave={handleSaveSignature}
+          onDelete={handleDeleteSignature}
+          onSelect={(id) => { setSelectedSigId(id); setShowCreator(false); }}
+          selectedId={selectedSigId}
+          onClose={() => setShowCreator(false)}
+        />
       )}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

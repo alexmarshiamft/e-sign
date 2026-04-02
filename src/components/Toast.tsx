@@ -34,7 +34,7 @@ export function ToastContainer({ toasts, onDismiss }: Props) {
         return (
           <div
             key={t.id}
-            className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg animate-in slide-in-from-right-4 fade-in ${colors[t.type]}`}
+            className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg toast-slide-in ${colors[t.type]}`}
           >
             <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${iconColors[t.type]}`} />
             <p className="text-sm font-medium flex-1">{t.message}</p>

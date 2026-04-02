@@ -102,9 +102,11 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
 
 export function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  // Use chunked approach to avoid "Maximum call stack size exceeded" on large files
+  const chunkSize = 8192;
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
 }
