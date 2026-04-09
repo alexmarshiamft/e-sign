@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ESignDocument, SignatureField, DocumentStatus } from '../types';
+import { ESignDocument, SignatureField, DocumentStatus, AuditLogEntry } from '../types';
 import { arrayBufferToBase64 } from '../utils/pdfUtils';
 
 const STORAGE_KEY = 'esign_documents';
@@ -7,7 +7,11 @@ const STORAGE_KEY = 'esign_documents';
 function loadFromStorage(): ESignDocument[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return parsed.map((doc: any) => ({
+      ...doc,
+      auditTrail: doc.auditTrail || []
+    }));
   } catch {
     return [];
   }
@@ -40,6 +44,14 @@ export function useDocuments() {
         status: 'unsigned',
         uploadedAt: Date.now(),
         fields: [],
+        auditTrail: [
+          {
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            action: 'Document Uploaded',
+            details: `File "${file.name}" uploaded to system`,
+          }
+        ]
       };
       persist([...loadFromStorage(), doc]);
       return doc;
@@ -62,6 +74,27 @@ export function useDocuments() {
     [persist]
   );
 
+  const logAuditEvent = useCallback(
+    (id: string, action: string, details?: string) => {
+      const current = loadFromStorage();
+      persist(
+        current.map((d) => {
+          if (d.id === id) {
+            const entry: AuditLogEntry = {
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              action,
+              details,
+            };
+            return { ...d, auditTrail: [...(d.auditTrail || []), entry] };
+          }
+          return d;
+        })
+      );
+    },
+    [persist]
+  );
+
   const updateFields = useCallback(
     (id: string, fields: SignatureField[]) => {
       updateDocument(id, {
@@ -74,10 +107,29 @@ export function useDocuments() {
 
   const markSigned = useCallback(
     (id: string, signedData: string) => {
-      updateDocument(id, { status: 'signed' as DocumentStatus, signedData });
+      const current = loadFromStorage();
+      persist(
+        current.map((d) => {
+          if (d.id === id) {
+            const entry: AuditLogEntry = {
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              action: 'Document Signed',
+              details: 'Signatures and fields embedded into document',
+            };
+            return {
+              ...d,
+              status: 'signed' as DocumentStatus,
+              signedData,
+              auditTrail: [...(d.auditTrail || []), entry],
+            };
+          }
+          return d;
+        })
+      );
     },
-    [updateDocument]
+    [persist]
   );
 
-  return { documents, addDocument, deleteDocument, updateDocument, updateFields, markSigned };
+  return { documents, addDocument, deleteDocument, updateDocument, updateFields, markSigned, logAuditEvent };
 }

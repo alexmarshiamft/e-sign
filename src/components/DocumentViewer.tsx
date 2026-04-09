@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { ESignDocument, SignatureField, FieldType, SavedSignature } from '../types';
 import { SignatureFieldOverlay } from './SignatureField';
 import { Toolbar } from './Toolbar';
+import { AuditTrailPanel } from './AuditTrailPanel';
 import { embedSignaturesIntoPdf, downloadBlob } from '../utils/pdfUtils';
 
 // Use locally bundled worker to avoid CDN version mismatches
@@ -23,6 +24,7 @@ interface Props {
   onMarkSigned: (id: string, signedData: string) => void;
   onOpenSignatureCreator: () => void;
   onToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onLogAuditEvent: (id: string, action: string, details?: string) => void;
 }
 
 export function DocumentViewer({
@@ -34,6 +36,7 @@ export function DocumentViewer({
   onMarkSigned,
   onOpenSignatureCreator,
   onToast,
+  onLogAuditEvent,
 }: Props) {
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,6 +46,7 @@ export function DocumentViewer({
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const [signing, setSigning] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   // Show signed PDF if available, otherwise original
   const pdfBase64 = doc.status === 'signed' && doc.signedData ? doc.signedData : doc.data;
@@ -84,14 +88,18 @@ export function DocumentViewer({
         // Don't delete when typing in a text field
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+        const fieldToDelete = doc.fields.find(f => f.id === selectedFieldId);
         const updated = doc.fields.filter((f) => f.id !== selectedFieldId);
         onUpdateFields(doc.id, updated);
+        if (fieldToDelete) {
+          onLogAuditEvent(doc.id, 'Field Removed', `Removed ${fieldToDelete.type} field from page ${fieldToDelete.pageNumber}`);
+        }
         setSelectedFieldId(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFieldId, doc.fields, doc.id, onUpdateFields]);
+  }, [selectedFieldId, doc.fields, doc.id, onUpdateFields, onLogAuditEvent]);
 
   const handlePageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -125,9 +133,10 @@ export function DocumentViewer({
 
       const updated = [...doc.fields, newField];
       onUpdateFields(doc.id, updated);
+      onLogAuditEvent(doc.id, 'Field Added', `Added ${activeTool} field to page ${currentPage}`);
       setSelectedFieldId(newField.id);
     },
-    [activeTool, currentPage, doc.fields, doc.id, onUpdateFields, selectedSignatureId, signatures]
+    [activeTool, currentPage, doc.fields, doc.id, onUpdateFields, selectedSignatureId, signatures, onLogAuditEvent]
   );
 
   const updateField = useCallback(
@@ -140,17 +149,22 @@ export function DocumentViewer({
 
   const deleteField = useCallback(
     (fieldId: string) => {
+      const fieldToDelete = doc.fields.find(f => f.id === fieldId);
       const updated = doc.fields.filter((f) => f.id !== fieldId);
       onUpdateFields(doc.id, updated);
+      if (fieldToDelete) {
+        onLogAuditEvent(doc.id, 'Field Removed', `Removed ${fieldToDelete.type} field from page ${fieldToDelete.pageNumber}`);
+      }
       if (selectedFieldId === fieldId) setSelectedFieldId(null);
     },
-    [doc.fields, doc.id, onUpdateFields, selectedFieldId]
+    [doc.fields, doc.id, onUpdateFields, selectedFieldId, onLogAuditEvent]
   );
 
   const clearAllFields = useCallback(() => {
     onUpdateFields(doc.id, []);
+    onLogAuditEvent(doc.id, 'Fields Cleared', 'Removed all fields from document');
     setSelectedFieldId(null);
-  }, [doc.id, onUpdateFields]);
+  }, [doc.id, onUpdateFields, onLogAuditEvent]);
 
   const handleSignNow = useCallback(async () => {
     if (signatures.length === 0) {
@@ -179,6 +193,7 @@ export function DocumentViewer({
           signatureDataUrl: sigToUse.dataUrl,
         },
       ];
+      onLogAuditEvent(doc.id, 'Field Added', 'Auto-placed signature field on page 1');
     } else {
       // Attach signature to unsigned signature/initials fields
       fields = fields.map((f) => {
@@ -214,6 +229,7 @@ export function DocumentViewer({
     onMarkSigned,
     onOpenSignatureCreator,
     onToast,
+    onLogAuditEvent
   ]);
 
   const handleDownload = useCallback(() => {
@@ -239,104 +255,115 @@ export function DocumentViewer({
         hasFields={doc.fields.length > 0}
         onClearFields={clearAllFields}
         isSigned={doc.status === 'signed'}
+        onToggleAuditTrail={() => setShowAuditTrail((prev) => !prev)}
       />
 
-      {/* Scroll area */}
-      <div className="flex-1 overflow-auto bg-gray-200 p-4">
-        {/* Page nav + zoom */}
-        <div className="flex items-center justify-center gap-4 mb-3">
-          <button
-            disabled={currentPage <= 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-            className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
-            title="Previous page"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-medium text-gray-700">
-            Page {currentPage} / {numPages || '—'}
-          </span>
-          <button
-            disabled={currentPage >= numPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-            className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
-            title="Next page"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-          <div className="h-4 w-px bg-gray-400" />
-          <button
-            onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(1)))}
-            className="p-1 rounded hover:bg-gray-300"
-            title="Zoom out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-gray-600 w-9 text-center">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => setScale((s) => Math.min(2.5, +(s + 0.1).toFixed(1)))}
-            className="p-1 rounded hover:bg-gray-300"
-            title="Zoom in"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Hint when tool active */}
-        {activeTool && (
-          <p className="text-center text-xs text-blue-600 font-medium mb-2">
-            Click on the document to place a <strong>{activeTool}</strong> field · Press <kbd className="bg-white px-1 rounded border text-xs">Esc</kbd> to cancel
-          </p>
-        )}
-
-        {/* PDF Page */}
-        <div className="flex justify-center">
-          <div className="relative shadow-xl" style={{ display: 'inline-block' }}>
-            {/* Overlay for field placement & rendering */}
-            <div
-              ref={pageContainerRef}
-              className={`absolute inset-0 z-10 ${activeTool ? 'cursor-crosshair' : 'cursor-default'}`}
-              onClick={handlePageClick}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Scroll area */}
+        <div className="flex-1 overflow-auto bg-gray-200 p-4">
+          {/* Page nav + zoom */}
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <button
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
+              title="Previous page"
             >
-              {pageFields.map((f) => (
-                <SignatureFieldOverlay
-                  key={f.id}
-                  field={f}
-                  containerWidth={containerSize.width}
-                  containerHeight={containerSize.height}
-                  signatures={signatures}
-                  isSelected={selectedFieldId === f.id}
-                  onSelect={setSelectedFieldId}
-                  onUpdate={updateField}
-                  onDelete={deleteField}
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-gray-700">
+              Page {currentPage} / {numPages || '—'}
+            </span>
+            <button
+              disabled={currentPage >= numPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="p-1 rounded hover:bg-gray-300 disabled:opacity-40"
+              title="Next page"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <div className="h-4 w-px bg-gray-400" />
+            <button
+              onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(1)))}
+              className="p-1 rounded hover:bg-gray-300"
+              title="Zoom out"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs text-gray-600 w-9 text-center">{Math.round(scale * 100)}%</span>
+            <button
+              onClick={() => setScale((s) => Math.min(2.5, +(s + 0.1).toFixed(1)))}
+              className="p-1 rounded hover:bg-gray-300"
+              title="Zoom in"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Hint when tool active */}
+          {activeTool && (
+            <p className="text-center text-xs text-blue-600 font-medium mb-2">
+              Click on the document to place a <strong>{activeTool}</strong> field · Press <kbd className="bg-white px-1 rounded border text-xs">Esc</kbd> to cancel
+            </p>
+          )}
+
+          {/* PDF Page */}
+          <div className="flex justify-center">
+            <div className="relative shadow-xl" style={{ display: 'inline-block' }}>
+              {/* Overlay for field placement & rendering */}
+              <div
+                ref={pageContainerRef}
+                className={`absolute inset-0 z-10 ${activeTool ? 'cursor-crosshair' : 'cursor-default'}`}
+                onClick={handlePageClick}
+              >
+                {pageFields.map((f) => (
+                  <SignatureFieldOverlay
+                    key={f.id}
+                    field={f}
+                    containerWidth={containerSize.width}
+                    containerHeight={containerSize.height}
+                    signatures={signatures}
+                    isSelected={selectedFieldId === f.id}
+                    onSelect={setSelectedFieldId}
+                    onUpdate={updateField}
+                    onDelete={deleteField}
+                  />
+                ))}
+              </div>
+
+              <Document
+                file={pdfDataUri}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={
+                  <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-gray-400">
+                    Loading PDF…
+                  </div>
+                }
+                error={
+                  <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-red-400">
+                    Failed to load PDF
+                  </div>
+                }
+              >
+                <Page
+                  pageNumber={currentPage}
+                  scale={scale}
+                  onLoadSuccess={onPageLoadSuccess}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
                 />
-              ))}
+              </Document>
             </div>
-
-            <Document
-              file={pdfDataUri}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-gray-400">
-                  Loading PDF…
-                </div>
-              }
-              error={
-                <div className="w-[612px] h-[792px] bg-white flex items-center justify-center text-red-400">
-                  Failed to load PDF
-                </div>
-              }
-            >
-              <Page
-                pageNumber={currentPage}
-                scale={scale}
-                onLoadSuccess={onPageLoadSuccess}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
-              />
-            </Document>
           </div>
         </div>
+
+        {/* Audit Trail Sidebar */}
+        {showAuditTrail && (
+          <AuditTrailPanel
+            entries={doc.auditTrail || []}
+            onClose={() => setShowAuditTrail(false)}
+          />
+        )}
       </div>
 
       {/* Signing overlay */}
