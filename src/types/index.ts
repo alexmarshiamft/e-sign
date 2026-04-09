@@ -14,6 +14,13 @@ export interface SignatureField {
   signatureDataUrl?: string;
 }
 
+export interface AuditLogEntry {
+  id: string;
+  timestamp: number;
+  action: string;
+  details?: string;
+}
+
 export interface ESignDocument {
   id: string;
   name: string;
@@ -22,6 +29,7 @@ export interface ESignDocument {
   uploadedAt: number;
   fields: SignatureField[];
   signedData?: string; // base64 of the signed PDF
+  auditTrail: AuditLogEntry[];
 }
 
 export type SignatureMethod = 'draw' | 'type' | 'upload';

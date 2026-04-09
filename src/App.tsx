@@ -13,7 +13,7 @@ import { ESignDocument } from './types';
 let toastCounter = 0;
 
 export default function App() {
-  const { documents, addDocument, deleteDocument, updateFields, markSigned } = useDocuments();
+  const { documents, addDocument, deleteDocument, updateFields, markSigned, logAuditEvent } = useDocuments();
   const { signatures, addSignature, deleteSignature } = useSignatures();
   const [selectedDoc, setSelectedDoc] = useState<ESignDocument | null>(null);
   const [showCreator, setShowCreator] = useState(false);
@@ -70,6 +70,20 @@ export default function App() {
     [deleteSignature, selectedSigId, addToast]
   );
 
+  const handleLogAuditEvent = useCallback(
+    (id: string, action: string, details?: string) => {
+      logAuditEvent(id, action, details);
+      setSelectedDoc((prev) => {
+        if (prev?.id === id) {
+          const entry = { id: crypto.randomUUID(), timestamp: Date.now(), action, details };
+          return { ...prev, auditTrail: [...(prev.auditTrail || []), entry] };
+        }
+        return prev;
+      });
+    },
+    [logAuditEvent]
+  );
+
   const handleUpdateFields = useCallback(
     (id: string, fields: Parameters<typeof updateFields>[1]) => {
       updateFields(id, fields);
@@ -83,7 +97,13 @@ export default function App() {
   const handleMarkSigned = useCallback(
     (id: string, signedData: string) => {
       markSigned(id, signedData);
-      setSelectedDoc((prev) => (prev?.id === id ? { ...prev, status: 'signed', signedData } : prev));
+      setSelectedDoc((prev) => {
+        if (prev?.id === id) {
+          const entry = { id: crypto.randomUUID(), timestamp: Date.now(), action: 'Document Signed', details: 'Signatures and fields embedded into document' };
+          return { ...prev, status: 'signed', signedData, auditTrail: [...(prev.auditTrail || []), entry] };
+        }
+        return prev;
+      });
     },
     [markSigned]
   );
@@ -156,6 +176,7 @@ export default function App() {
             onMarkSigned={handleMarkSigned}
             onOpenSignatureCreator={() => setShowCreator(true)}
             onToast={addToast}
+            onLogAuditEvent={handleLogAuditEvent}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
@@ -190,3 +211,4 @@ export default function App() {
     </div>
   );
 }
+

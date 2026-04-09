@@ -1,5 +1,5 @@
 import React from 'react';
-import { PenLine, Type, CalendarDays, CheckSquare, Download, Trash2, BadgeCheck } from 'lucide-react';
+import { PenLine, Type, CalendarDays, CheckSquare, Download, Trash2, BadgeCheck, FileClock } from 'lucide-react';
 import { FieldType, SavedSignature } from '../types';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   hasFields: boolean;
   onClearFields: () => void;
   isSigned: boolean;
+  onToggleAuditTrail: () => void;
 }
 
 const tools: { id: FieldType; label: string; Icon: React.FC<{ className?: string }> }[] = [
@@ -37,6 +38,7 @@ export function Toolbar({
   hasFields,
   onClearFields,
   isSigned,
+  onToggleAuditTrail,
 }: Props) {
   const selectedSig = signatures.find((s) => s.id === selectedSignatureId);
 
@@ -107,6 +109,16 @@ export function Toolbar({
       </button>
 
       <div className="flex-1" />
+
+      {/* Audit Trail */}
+      <button
+        onClick={onToggleAuditTrail}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+        title="View Audit Trail"
+      >
+        <FileClock className="w-4 h-4" />
+        Audit Trail
+      </button>
 
       {/* Signed badge */}
       {isSigned && (
