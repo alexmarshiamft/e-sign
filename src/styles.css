@@ -1,6 +1,6 @@
 :root {
-  color: #162032;
-  background: #eef2f7;
+  color: #172033;
+  background: #edf2f7;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -18,19 +18,13 @@ body {
 }
 
 button,
-input,
-textarea {
+input {
   font: inherit;
 }
 
 button {
   border: 0;
   cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .app {
@@ -44,8 +38,8 @@ button:disabled {
   flex-direction: column;
   gap: 22px;
   padding: 24px;
-  background: #101827;
-  color: #f7f9fc;
+  color: #f8fafc;
+  background: #0f172a;
 }
 
 .brand {
@@ -61,15 +55,16 @@ button:disabled {
 
 .brand span,
 .statusCard span,
+.sidePanel p,
 .auditItem span,
 .auditItem p,
-.helper,
 small {
   color: #6b7280;
 }
 
 .sidebar .brand span,
 .sidebar .statusCard span,
+.sidebar .sidePanel p,
 .sidebar .auditItem span,
 .sidebar .auditItem p {
   color: #a9b4c7;
@@ -80,18 +75,16 @@ small {
   place-items: center;
   width: 48px;
   height: 48px;
-  color: #0d372f;
-  background: #72e4c5;
+  color: #042f2e;
+  background: #7dd3fc;
   border-radius: 8px;
 }
 
 .statusCard,
-.step,
+.sidePanel,
 .auditItem,
-.panel,
-.recipient,
-.signatureBlock {
-  border: 1px solid rgba(148, 163, 184, 0.22);
+.panel {
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 8px;
 }
 
@@ -103,52 +96,22 @@ small {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.statusDot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #f59e0b;
+.sidePanel {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.statusDot.sent {
-  background: #3b82f6;
-}
-
-.statusDot.completed {
-  background: #10b981;
-}
-
-.steps {
-  display: grid;
-  gap: 10px;
-}
-
-.step {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 18px;
-  gap: 10px;
-  align-items: center;
-  min-height: 44px;
-  padding: 10px 12px;
-  color: #cbd5e1;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.step.done {
-  color: #d7fff4;
-  border-color: rgba(114, 228, 197, 0.5);
+.sidePanel h2,
+.audit h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .audit {
   min-height: 0;
   overflow: auto;
-}
-
-.audit h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .auditItem {
@@ -174,8 +137,6 @@ main {
 
 .topbar,
 .panelHeader,
-.recipientTop,
-.recipientActions,
 .actions,
 .saved {
   display: flex;
@@ -194,16 +155,16 @@ main {
 }
 
 .topbar h1 {
-  max-width: 680px;
+  max-width: 760px;
   font-size: clamp(30px, 5vw, 54px);
   line-height: 1;
 }
 
 .eyebrow {
   margin: 0 0 7px;
-  color: #0f766e;
+  color: #075985;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -215,8 +176,7 @@ main {
 }
 
 .ghost,
-.primary,
-.sendButton {
+.primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -224,7 +184,8 @@ main {
   min-height: 42px;
   padding: 0 16px;
   border-radius: 8px;
-  font-weight: 800;
+  font-weight: 850;
+  text-decoration: none;
 }
 
 .ghost {
@@ -233,15 +194,13 @@ main {
   background: #ffffff;
 }
 
-.primary,
-.sendButton {
-  color: #062d25;
-  background: #72e4c5;
+.primary {
+  color: #03202d;
+  background: #7dd3fc;
 }
 
-.compact {
-  min-height: 36px;
-  padding: 0 12px;
+.full {
+  width: 100%;
 }
 
 .tiny {
@@ -254,21 +213,17 @@ main {
   color: #b42318;
 }
 
-.workspace,
-.signingGrid {
+.workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
   align-items: start;
 }
 
-.signingGrid {
-  margin-top: 18px;
-}
-
 .panel {
   padding: 20px;
-  background: rgba(255, 255, 255, 0.86);
+  margin-bottom: 18px;
+  background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
 }
 
@@ -284,12 +239,13 @@ label {
   margin-bottom: 14px;
   color: #465266;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 850;
 }
 
-input,
-textarea {
+input {
   width: 100%;
+  height: 42px;
+  padding: 0 12px;
   color: #121a2a;
   border: 1px solid #d4dce9;
   border-radius: 8px;
@@ -297,157 +253,229 @@ textarea {
   background: #ffffff;
 }
 
-input {
-  height: 42px;
-  padding: 0 12px;
+input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.14);
 }
 
-textarea {
-  min-height: 380px;
-  resize: vertical;
-  padding: 14px;
-  line-height: 1.5;
-}
-
-input:focus,
-textarea:focus {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-}
-
-.recipientList {
+.formGrid {
   display: grid;
   gap: 12px;
 }
 
-.recipient {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  background: #f8fafc;
+.formGrid.two {
+  grid-template-columns: 1fr 1.4fr;
 }
 
-.recipient.active {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-}
-
-.recipientTop {
-  justify-content: space-between;
-  color: #0f766e;
-}
-
-.recipientTop span {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  color: #ffffff;
-  background: #0f766e;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.recipientActions {
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.sendButton {
-  width: 100%;
-  margin-top: 14px;
-}
-
-.documentPreview pre {
-  min-height: 360px;
-  margin: 0;
-  padding: 24px;
-  white-space: pre-wrap;
-  color: #222b3c;
-  border: 1px solid #d7dfeb;
-  border-radius: 8px;
-  background: #ffffff;
-  font-family: Georgia, "Times New Roman", serif;
-  line-height: 1.6;
+.formGrid.three {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .saved {
   gap: 6px;
-  color: #0f766e;
+  color: #075985;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 850;
 }
 
-.signatureBlocks {
+.pdfPanel img {
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  border: 1px solid #d7dfeb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hoursPanel {
+  overflow: auto;
+}
+
+.hoursTable {
+  min-width: 1120px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hoursHeader,
+.hoursRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  grid-template-columns: 140px 90px 118px 112px 140px 90px 90px minmax(220px, 1fr);
+  align-items: stretch;
 }
 
-.signatureBlock {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  background: #f8fafc;
+.hoursHeader span,
+.hoursRow > input,
+.hoursRow > strong,
+.rowSignature {
+  min-height: 50px;
+  padding: 8px;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
 }
 
-.signatureBlock span {
-  color: #667085;
+.hoursHeader span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  background: #e2e8f0;
   font-size: 12px;
   font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-align: center;
+}
+
+.hoursRow > input {
+  border: 0;
+  border-radius: 0;
+}
+
+.hoursRow > strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowSignature {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #f8fafc;
 }
 
 .script {
-  min-height: 42px;
   font-family: "Brush Script MT", "Segoe Script", cursive;
-  font-size: 32px;
-  font-weight: 400;
+  font-size: 25px;
+  line-height: 1;
 }
 
-.signerPanel {
-  position: sticky;
-  top: 20px;
+.totals {
+  background: #f1f5f9;
 }
 
-.helper {
+.totals > * {
+  font-weight: 900;
+  border-top: 3px solid #111827;
+}
+
+.previewPanel {
+  background: #dbeafe;
+}
+
+.printPacket {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+  color: #111827;
+  background: white;
+  border-radius: 8px;
+}
+
+.bbsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.bbsHeader p {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.bbsHeader h2 {
+  margin: 0;
+  color: #082a66;
+  font-size: 34px;
+  letter-spacing: 0.04em;
+}
+
+.bbsHeader img {
+  width: 220px;
+  height: 90px;
+  object-fit: cover;
+  object-position: 78% 0;
+}
+
+.bbsInstructions {
+  text-align: center;
+  font-size: 18px;
+  font-style: italic;
   line-height: 1.45;
 }
 
-.signatureInput {
+.bbsInfoGrid {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 12px;
-  margin: 18px 0;
-  border: 1px dashed #98a8bd;
-  border-radius: 8px;
-  background: #f8fafc;
+  grid-template-columns: 1.2fr 0.7fr 0.7fr;
+  border: 1px solid #111;
 }
 
-.signatureInput input {
-  height: 48px;
-  font-family: "Brush Script MT", "Segoe Script", cursive;
-  font-size: 30px;
+.bbsInfoGrid div {
+  min-height: 54px;
+  padding: 8px;
+  border-right: 1px solid #111;
+  border-bottom: 1px solid #111;
+  font-size: 17px;
 }
 
-.full {
+.bbsInfoGrid div:nth-child(3n),
+.bbsInfoGrid .wide {
+  border-right: 0;
+}
+
+.bbsInfoGrid .wide {
+  grid-column: 1 / -1;
+}
+
+.bbsTable {
   width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-@media (max-width: 980px) {
-  .app,
-  .workspace,
-  .signingGrid {
-    grid-template-columns: 1fr;
-  }
+.bbsTable th,
+.bbsTable td {
+  min-height: 42px;
+  padding: 7px;
+  border: 1px solid #111;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 13px;
+}
 
-  .sidebar {
-    position: static;
+.bbsTable th:first-child,
+.bbsTable td:first-child {
+  width: 190px;
+  text-align: left;
+}
+
+.bbsTable th:last-child,
+.bbsTable td:last-child {
+  width: 210px;
+}
+
+.totalRow td {
+  border-top: 4px solid #111;
+  font-weight: 900;
+}
+
+.bbsFootnotes {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.auditSheet {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 2px solid #111;
+}
+
+@media (max-width: 1060px) {
+  .app,
+  .workspace {
+    grid-template-columns: 1fr;
   }
 
   .topbar {
@@ -458,30 +486,46 @@ textarea:focus {
   .actions {
     justify-content: flex-start;
   }
+}
 
-  .signerPanel {
-    position: static;
+@media (max-width: 720px) {
+  main,
+  .sidebar {
+    padding: 18px;
+  }
+
+  .formGrid.two,
+  .formGrid.three {
+    grid-template-columns: 1fr;
   }
 }
 
 @media print {
   .sidebar,
   .topbar,
-  .editor,
-  .workspace > .panel:not(.editor),
-  .signerPanel {
+  .workspace,
+  .hoursPanel,
+  .previewPanel > .panelHeader {
     display: none;
   }
 
-  .app,
-  .signingGrid {
+  .app {
     display: block;
   }
 
   main,
-  .panel {
+  .panel,
+  .previewPanel {
     padding: 0;
-    box-shadow: none;
+    margin: 0;
     border: 0;
+    box-shadow: none;
+    background: white;
+  }
+
+  .printPacket {
+    max-width: none;
+    padding: 0;
+    border-radius: 0;
   }
 }

@@ -1,8 +1,7 @@
-# SignFlow e-sign
+# BBS SignFlow
 
-A fully functional browser-based e-signature workspace. It lets you prepare a
-document, add multiple signers, mark an envelope as sent, collect typed legal
-signatures, maintain an audit trail, print, and export a signed HTML copy.
+A browser-based signing workflow for the California BBS Weekly Log of
+Experience Hours template.
 
 ## Run locally
 
@@ -13,14 +12,17 @@ npm run dev
 
 ## Features
 
-- Document editor with text import
-- Multi-recipient signer routing
-- Envelope statuses: draft, sent, completed
-- Typed signature capture
+- Bundled source PDF/template preview
+- Prefilled trainee, supervisor, work-setting, AMFT, and year fields
+- Ten weekly experience-hour rows matching the BBS log
+- Automatic C totals using A + B only
+- Supervisor signature capture per week row
+- One-click signing for all filled rows
 - Local browser persistence
 - Timestamped audit trail
-- Printable signed document view
-- Exportable signed HTML package
+- Printable BBS weekly log packet
+- Exportable signed HTML packet
 
 This MVP stores data in the browser with `localStorage`, which makes it useful
-for demos and lightweight internal workflows without requiring a backend.
+for local preparation and supervisor review workflows without requiring a
+backend.
